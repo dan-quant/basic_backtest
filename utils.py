@@ -20,14 +20,12 @@ def timeme(func):
     return timediff
 
 
-@timeme
 def load_pickle(path):
     with lzma.open(path, "rb") as file_read:
         file = pickle.load(file_read)
     return file
 
 
-@timeme
 def save_pickle(path, obj):
     with lzma.open(path, "wb") as file_write:
         pickle.dump(obj, file_write)
@@ -39,19 +37,19 @@ def get_pnl_stats(date, prev, portfolio_df, insts, idx, dfs):
 
     # iterates over all instruments in the list insts and computes the daily pnl and nominal return for each
     for inst in insts:
-        units = portfolio_df.loc[idx - 1, f"{inst} units"]
+        units = portfolio_df.at[idx - 1, f"{inst} units"]
         if units != 0:
-            price_change = dfs[inst].loc[date, "close"] - dfs[inst].loc[prev, "close"]
+            price_change = dfs[inst].at[date, "close"] - dfs[inst].at[prev, "close"]
             inst_pnl = price_change * units
             day_pnl += inst_pnl
-            nominal_ret += portfolio_df.loc[idx - 1, f"{inst} w"] * dfs[inst].loc[date, "ret"]
+            nominal_ret += portfolio_df.at[idx - 1, f"{inst} w"] * dfs[inst].at[date, "ret"]
 
     # updates capital, adds daily pnl, capital return and nominal return information to the portfolio dataframe
-    capital_ret = nominal_ret * portfolio_df.loc[idx - 1, "leverage"]
-    portfolio_df.loc[idx, "capital"] = portfolio_df.loc[idx - 1, "capital"] + day_pnl
-    portfolio_df.loc[idx, "day_pnl"] = day_pnl
-    portfolio_df.loc[idx, "nominal_ret"] = nominal_ret
-    portfolio_df.loc[idx, "capital_ret"] = capital_ret
+    capital_ret = nominal_ret * portfolio_df.at[idx - 1, "leverage"]
+    portfolio_df.at[idx, "capital"] = portfolio_df.at[idx - 1, "capital"] + day_pnl
+    portfolio_df.at[idx, "day_pnl"] = day_pnl
+    portfolio_df.at[idx, "nominal_ret"] = nominal_ret
+    portfolio_df.at[idx, "capital_ret"] = capital_ret
 
     return day_pnl, capital_ret
 
@@ -96,7 +94,6 @@ class Alpha:
     def compute_signal_distribution(self, eligibles, date):
         raise AbstractImplementationException("A concrete implementation for signal generation is missing.")
 
-    @timeme
     def compute_meta_info(self, trade_range):
 
         self.pre_compute(trade_range=trade_range)
@@ -155,10 +152,10 @@ class Alpha:
         portfolio_df = self.init_portfolio_settings(trade_range=date_range)
 
         for i in portfolio_df.index:
-            date = portfolio_df.loc[i, "datetime"]
+            date = portfolio_df.at[i, "datetime"]
 
             # filtering the instrument that were eligible for trading on the date
-            eligibles = [inst for inst in self.insts if self.dfs[inst].loc[date, "eligible"]]
+            eligibles = [inst for inst in self.insts if self.dfs[inst].at[date, "eligible"]]
             non_eligibles = [inst for inst in self.insts if inst not in eligibles]
 
             # initial scalar applied to forecasts, used for volatility targeting
@@ -166,7 +163,7 @@ class Alpha:
 
             if i != 0:
                 # computes the pnl for the date
-                date_prev = portfolio_df.loc[i - 1, "datetime"]
+                date_prev = portfolio_df.at[i - 1, "datetime"]
 
                 # gets the scalar used for strategy vol targeting
                 strat_scalar = self.get_strat_scalar(
@@ -201,12 +198,12 @@ class Alpha:
             # compute positions and other information
             for inst in non_eligibles:
                 # weights and # of units of each instrument in the portfolio, for date i, instrument inst
-                portfolio_df.loc[i, f"{inst} w"] = 0
-                portfolio_df.loc[i, f"{inst} units"] = 0
+                portfolio_df.at[i, f"{inst} w"] = 0
+                portfolio_df.at[i, f"{inst} units"] = 0
 
             # position size adjustment for volatility targeting
             # we convert the annualised vol target to a daily vol expressed in dollar terms
-            vol_target = (self.portfolio_vol / np.sqrt(253)) * portfolio_df.loc[i, "capital"]
+            vol_target = (self.portfolio_vol / np.sqrt(253)) * portfolio_df.at[i, "capital"]
 
             nominal_total = 0
             for inst in eligibles:
@@ -216,24 +213,24 @@ class Alpha:
                 # scaled_forecast = % of inst alpha / sum of absolute alpha of all insts
                 scaled_forecast = forecast / forecast_chips if forecast_chips != 0 else 0
                 inst_vol_target = scaled_forecast * vol_target
-                inst_vol = self.dfs[inst].loc[date, "vol"] * self.dfs[inst].loc[date, "close"]
+                inst_vol = self.dfs[inst].at[date, "vol"] * self.dfs[inst].at[date, "close"]
                 position = strat_scalar * inst_vol_target / inst_vol
 
                 # adds the units of each instrument for the date
-                portfolio_df.loc[i, f"{inst} units"] = position
-                nominal_total += abs(position * self.dfs[inst].loc[date, "close"])
+                portfolio_df.at[i, f"{inst} units"] = position
+                nominal_total += abs(position * self.dfs[inst].at[date, "close"])
 
             for inst in eligibles:
-                units = portfolio_df.loc[i, f"{inst} units"]
-                nominal_inst = units * self.dfs[inst].loc[date, "close"]
+                units = portfolio_df.at[i, f"{inst} units"]
+                nominal_inst = units * self.dfs[inst].at[date, "close"]
                 inst_w = nominal_inst / nominal_total
 
                 # adds the weight of each instrument for the date
-                portfolio_df.loc[i, f"{inst} w"] = inst_w
+                portfolio_df.at[i, f"{inst} w"] = inst_w
 
             # computes the portfolio nominal notional and leverage for the date
-            portfolio_df.loc[i, "nominal"] = nominal_total
-            portfolio_df.loc[i, "leverage"] = nominal_total / portfolio_df.loc[i, "capital"]
+            portfolio_df.at[i, "nominal"] = nominal_total
+            portfolio_df.at[i, "leverage"] = nominal_total / portfolio_df.at[i, "capital"]
 
         return portfolio_df.set_index("datetime", drop=True)
 

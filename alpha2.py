@@ -38,7 +38,7 @@ class Alpha2(Alpha):
 
         for inst in eligibles:
             # get the alphas generated for each instrument on each date
-            forecasts[inst] = self.dfs[inst].loc[date, "alpha"]
+            forecasts[inst] = self.dfs[inst].at[date, "alpha"]
 
         absolute_scores = np.abs([score for score in forecasts.values()])
         forecast_chips = np.sum(absolute_scores)

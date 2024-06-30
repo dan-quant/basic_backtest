@@ -17,9 +17,9 @@ import matplotlib.pyplot as plt
 TIMEZONE = pytz.utc
 PERIOD_START_DATE = datetime(2010, 1, 1, tzinfo=TIMEZONE)
 PERIOD_END_DATE = datetime.now(tz=TIMEZONE)
+NUMBER_OF_TICKERS = 20
 
 
-@timeme
 def get_sp500_tickers():
 
     # gets all the tickers of the S&P 500
@@ -69,7 +69,6 @@ def get_history(ticker, period_start, period_end, granularity="1d", tries=0):
     return df
 
 
-@timeme
 def get_histories(tickers, period_starts, period_ends, granularity="1d"):
 
     # multithreaded function that gets the data for each ticker and returns the tickers and dataframes with the data
@@ -90,7 +89,6 @@ def get_histories(tickers, period_starts, period_ends, granularity="1d"):
     return tickers, dfs
 
 
-@timeme
 def get_ticker_dfs(start, end):
     # checks if there is a file saved with the data, otherwise requests it from yfinance and saves the data in a file
     try:
@@ -118,23 +116,23 @@ def plot_vol(r):
     plt.close()
 
 
-if __name__ == '__main__':
+def main():
     tickers, ticker_dfs = get_ticker_dfs(start=PERIOD_START_DATE,
                                          end=PERIOD_END_DATE)
 
-    alpha1 = Alpha1(insts=tickers[:10],
+    alpha1 = Alpha1(insts=tickers[:NUMBER_OF_TICKERS],
                     dfs=ticker_dfs,
                     start=PERIOD_START_DATE,
                     end=PERIOD_END_DATE
                     )
 
-    alpha2 = Alpha2(insts=tickers[:10],
+    alpha2 = Alpha2(insts=tickers[:NUMBER_OF_TICKERS],
                     dfs=ticker_dfs,
                     start=PERIOD_START_DATE,
                     end=PERIOD_END_DATE
                     )
 
-    alpha3 = Alpha3(insts=tickers[:10],
+    alpha3 = Alpha3(insts=tickers[:NUMBER_OF_TICKERS],
                     dfs=ticker_dfs,
                     start=PERIOD_START_DATE,
                     end=PERIOD_END_DATE
@@ -144,15 +142,37 @@ if __name__ == '__main__':
     df2 = alpha2.run_simulation()
     df3 = alpha3.run_simulation()
 
-    df1 = df1.set_index("datetime", drop=True)
-    df2 = df2.set_index("datetime", drop=True)
-    df3 = df3.set_index("datetime", drop=True)
+    print(f"df1: {list(df1.capital)[-1]}")
+    print(f"df2: {list(df2.capital)[-1]}")
+    print(f"df3: {list(df3.capital)[-1]}")
 
-    portfolio = Portfolio(insts=tickers[:10],
-                          dfs=ticker_dfs,
-                          start=PERIOD_START_DATE,
-                          end=PERIOD_END_DATE,
-                          strat_dfs=[df1, df2, df3]
-                          )
+    # portfolio = Portfolio(insts=tickers[:10],
+    #                       dfs=ticker_dfs,
+    #                       start=PERIOD_START_DATE,
+    #                       end=PERIOD_END_DATE,
+    #                       strat_dfs=[df1, df2, df3]
+    #                       )
+    #
+    # portfolio_df = portfolio.run_simulation()
 
-    portfolio_df = portfolio.run_simulation()
+
+if __name__ == '__main__':
+    main()
+
+'''
+benchmark for 20 tickers:
+@timeme: run_simulation took 49.95934462547302 seconds.
+@timeme: run_simulation took 52.4849579334259 seconds.
+@timeme: run_simulation took 52.523226261138916 seconds.
+df1: 31346.569762350704
+df1: 9731.451568466826
+df1: 110581.37703868462
+
+replacing .loc by .at: 33% improvement
+@timeme: run_simulation took 33.58416390419006 seconds.
+@timeme: run_simulation took 35.01650428771973 seconds.
+@timeme: run_simulation took 34.62669062614441 seconds.
+df1: 31346.569762350704
+df2: 9731.451568466826
+df3: 110581.37703868462
+'''

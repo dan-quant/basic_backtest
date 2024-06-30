@@ -60,7 +60,7 @@ class Alpha1(Alpha):
 
         for inst in eligibles:
             # get the alphas generated for each instrument on each date
-            alpha_scores[inst] = self.dfs[inst].loc[date, "alpha"]
+            alpha_scores[inst] = self.dfs[inst].at[date, "alpha"]
 
         # sorts the alpha_scores dict by their alpha values
         alpha_scores = {k: v for k, v in sorted(alpha_scores.items(), key=lambda pair: pair[1])}
