@@ -140,11 +140,10 @@ if __name__ == '__main__':
                     end=PERIOD_END_DATE
                     )
 
-    # df1 = alpha1.run_simulation()
-    # df2 = alpha2.run_simulation()
-    # df3 = alpha3.run_simulation()
+    df1 = alpha1.run_simulation()
+    df2 = alpha2.run_simulation()
+    df3 = alpha3.run_simulation()
 
-    df1, df2, df3 = load_pickle("simulations_strat_vol_targeting.obj")
     df1 = df1.set_index("datetime", drop=True)
     df2 = df2.set_index("datetime", drop=True)
     df3 = df3.set_index("datetime", drop=True)
@@ -156,72 +155,4 @@ if __name__ == '__main__':
                           strat_dfs=[df1, df2, df3]
                           )
 
-    # portfolio_df = portfolio.run_simulation()
-
-    portfolio_df = load_pickle("simulations_portfolio.obj")
-
-    print(df1, df2, df3, portfolio_df)
-
-    logret = lambda df: np.log((1 + df.capital_ret).cumprod())
-
-    plt.plot(logret(portfolio_df), label="portfolio")
-    plt.plot(logret(df1), label="df1")
-    plt.plot(logret(df2), label="df2")
-    plt.plot(logret(df3), label="df3")
-    plt.legend(loc="upper left")
-    plt.show()
-    plt.close()
-
-    # portfolio_df = load_pickle("simulations_portfolio.obj")
-    # df1_, df2_, df3_ = load_pickle("simulations_inst_vol_targeting.obj")
-    # df1__, df2__, df3__ = load_pickle("simulations.obj")
-
-    # print("df1, df1_, df1__")
-    # print(df1, df1_, df1__)
-    #
-    # print("df2, df2_, df2__")
-    # print(df2, df2_, df2__)
-    #
-    # print("df3, df3_, df3__")
-    # print(df3, df3_, df3__)
-    #
-    # plt.plot(df1.capital, label="df1")
-    # plt.plot(df1_.capital, label="df1_")
-    # plt.plot(df1__.capital, label="df1__")
-    # plt.legend(loc="upper left")
-    # plt.show()
-    # plt.close()
-    #
-    # plt.plot(df2.capital, label="df2")
-    # plt.plot(df2_.capital, label="df2_")
-    # plt.plot(df2__.capital, label="df2__")
-    # plt.legend(loc="upper left")
-    # plt.show()
-    # plt.close()
-    #
-    # plt.plot(df3.capital, label="df3")
-    # plt.plot(df3_.capital, label="df3_")
-    # plt.plot(df3__.capital, label="df3__")
-    # plt.legend(loc="upper left")
-    # plt.show()
-    # plt.close()
-    #
-    # # lambda function to remove days with 0 capital returns. we do this because our index contains weekends, holidays,
-    # # and other days where there was no market, so the capital return would have been 0 since we ffill and bfill
-    # # the market data during the data pre-processing stage
-    nzr = lambda df: df.capital_ret.loc[df.capital_ret != 0].fillna(0)
-    #
-    # plot_vol(nzr(df1))
-    # plot_vol(nzr(df1_))
-    # plot_vol(nzr(df1__))
-    # plot_vol(nzr(df2))
-    # plot_vol(nzr(df2_))
-    # plot_vol(nzr(df2__))
-    # plot_vol(nzr(df3))
-    # plot_vol(nzr(df3_))
-    # plot_vol(nzr(df3__))
-    #
-    # print volatility of capital returns
-    print(nzr(df1).std() * np.sqrt(253), nzr(df2).std() * np.sqrt(253), nzr(df3).std() * np.sqrt(253), nzr(portfolio_df).std() * np.sqrt(253))
-    # print(nzr(df1_).std() * np.sqrt(253), nzr(df2_).std() * np.sqrt(253), nzr(df3_).std() * np.sqrt(253))
-    # print(nzr(df1__).std() * np.sqrt(253), nzr(df2__).std() * np.sqrt(253), nzr(df3__).std() * np.sqrt(253))
+    portfolio_df = portfolio.run_simulation()
