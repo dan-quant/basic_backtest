@@ -20,7 +20,7 @@ class Alpha2:
             .rename(columns={"index": "datetime"})
 
         # gives initial capital on the first date
-        portfolio_df.loc[0, "capital"] = 10000
+        portfolio_df.at[0, "capital"] = 10000
         return portfolio_df
 
     def compute_meta_info(self, trade_range):
@@ -75,15 +75,15 @@ class Alpha2:
         portfolio_df = self.init_portfolio_settings(trade_range=date_range)
 
         for i in portfolio_df.index:
-            date = portfolio_df.loc[i, "datetime"]
+            date = portfolio_df.at[i, "datetime"]
 
             # filtering the instrument that were eligible for trading on the date
-            eligibles = [inst for inst in self.insts if self.dfs[inst].loc[date, "eligible"]]
+            eligibles = [inst for inst in self.insts if self.dfs[inst].at[date, "eligible"]]
             non_eligibles = [inst for inst in self.insts if inst not in eligibles]
 
             if i != 0:
                 # computes the pnl for the date
-                date_prev = portfolio_df.loc[i - 1, "datetime"]
+                date_prev = portfolio_df.at[i - 1, "datetime"]
                 day_pnl, capital_ret = get_pnl_stats(
                     date=date,
                     prev=date_prev,
@@ -98,7 +98,7 @@ class Alpha2:
 
             for inst in eligibles:
                 # updates alphas scores using the numbers computed by compute_meta_info
-                alpha_scores[inst] = self.dfs[inst].loc[date, "alpha"]
+                alpha_scores[inst] = self.dfs[inst].at[date, "alpha"]
 
             absolute_scores = np.abs([score for score in alpha_scores.values()])
             forecast_chips = np.sum(absolute_scores)
@@ -106,30 +106,30 @@ class Alpha2:
             # compute positions and other information
             for inst in non_eligibles:
                 # weights and # of units of each instrument in the portfolio, for date i, instrument inst
-                portfolio_df.loc[i, f"{inst} w"] = 0
-                portfolio_df.loc[i, f"{inst} units"] = 0
+                portfolio_df.at[i, f"{inst} w"] = 0
+                portfolio_df.at[i, f"{inst} units"] = 0
 
             nominal_total = 0
             for inst in eligibles:
                 # forecast = position direction and size
                 forecast = alpha_scores[inst]
-                dollar_allocation = portfolio_df.loc[i, "capital"] / forecast_chips if forecast_chips !=0 else 0
-                position = forecast * dollar_allocation / self.dfs[inst].loc[date, "close"]
+                dollar_allocation = portfolio_df.at[i, "capital"] / forecast_chips if forecast_chips !=0 else 0
+                position = forecast * dollar_allocation / self.dfs[inst].at[date, "close"]
 
                 # adds the units of each instrument for the date
-                portfolio_df.loc[i, f"{inst} units"] = position
-                nominal_total += abs(position * self.dfs[inst].loc[date, "close"])
+                portfolio_df.at[i, f"{inst} units"] = position
+                nominal_total += abs(position * self.dfs[inst].at[date, "close"])
 
             for inst in eligibles:
-                units = portfolio_df.loc[i, f"{inst} units"]
-                nominal_inst = units * self.dfs[inst].loc[date, "close"]
+                units = portfolio_df.at[i, f"{inst} units"]
+                nominal_inst = units * self.dfs[inst].at[date, "close"]
                 inst_w = nominal_inst / nominal_total
 
                 # adds the weight of each instrument for the date
-                portfolio_df.loc[i, f"{inst} w"] = inst_w
+                portfolio_df.at[i, f"{inst} w"] = inst_w
 
             # computes the portfolio nominal notional and leverage for the date
-            portfolio_df.loc[i, "nominal"] = nominal_total
-            portfolio_df.loc[i, "leverage"] = nominal_total / portfolio_df.loc[i, "capital"]
+            portfolio_df.at[i, "nominal"] = nominal_total
+            portfolio_df.at[i, "leverage"] = nominal_total / portfolio_df.at[i, "capital"]
 
         return portfolio_df

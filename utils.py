@@ -78,10 +78,10 @@ class Alpha:
             .rename(columns={"index": "datetime"})
 
         # gives initial parameters on the first date of the trade_range
-        portfolio_df.loc[0, "capital"] = 10000.0
-        portfolio_df.loc[0, "day_pnl"] = 0.0
-        portfolio_df.loc[0, "capital_ret"] = 0.0
-        portfolio_df.loc[0, "nominal_ret"] = 0.0
+        portfolio_df.at[0, "capital"] = 10000.0
+        portfolio_df.at[0, "day_pnl"] = 0.0
+        portfolio_df.at[0, "capital_ret"] = 0.0
+        portfolio_df.at[0, "nominal_ret"] = 0.0
 
         return portfolio_df
 
@@ -263,6 +263,6 @@ class Portfolio(Alpha):
             for i in range(len(self.strat_dfs)):
 
                 # the below works because forecasts is a defaultdict(float)
-                forecasts[inst] += self.positions[inst].loc[date, i] * (1/len(self.strat_dfs))
+                forecasts[inst] += self.positions[inst].at[date, i] * (1/len(self.strat_dfs))
 
         return forecasts, np.sum(np.abs(list(forecasts.values())))
