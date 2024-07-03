@@ -143,6 +143,7 @@ class Alpha:
         return (target_vol / ann_realized_vol) * ewstrats[-1]
 
     @timeme
+    @profile
     def run_simulation(self):
         # defines the date range for the backtest
         date_range = pd.date_range(start=self.start, end=self.end, freq="D")

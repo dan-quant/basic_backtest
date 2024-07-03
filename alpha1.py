@@ -40,6 +40,7 @@ class Alpha1(Alpha):
 
         return
 
+    @profile
     def post_compute(self, trade_range):
         temp = []
         for inst in self.insts:

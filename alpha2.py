@@ -24,6 +24,7 @@ class Alpha2(Alpha):
             self.alphas[inst] = alpha
         return
 
+    # @profile
     def post_compute(self, trade_range):
         for inst in self.insts:
             self.dfs[inst]["alpha"] = self.alphas[inst].rolling(12).mean()

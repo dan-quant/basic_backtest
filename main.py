@@ -351,4 +351,134 @@ Line #      Hits         Time  Per Hit   % Time  Line Contents
    138
    139         3          2.0      0.7      0.0          return
 
+    ### line profiling utils.run_simulation and alpha1.post_compute
+    
+    Wrote profile results to main.py.lprof
+Timer unit: 1e-06 s
+
+Total time: 6.55374 s
+Function: post_compute at line 43
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+    43                                               @profile
+    44                                               def post_compute(self, trade_range):
+    45         1          0.6      0.6      0.0          temp = []
+    46        21         14.5      0.7      0.0          for inst in self.insts:
+    47        20      28497.8   1424.9      0.4              self.dfs[inst]["op4"] = self.op4s[inst]
+    48        20       2197.6    109.9      0.0              temp.append(self.dfs[inst]["op4"])
+    49
+    50         1       7898.2   7898.2      0.1          temp_df = pd.concat(temp, axis=1)
+    51         1        148.7    148.7      0.0          temp_df.columns = self.insts
+    52         1       1166.1   1166.1      0.0          temp_df = temp_df.replace(np.inf, 0).replace(-np.inf, 0)
+    53         1    6470301.9    6e+06     98.7          cszscre_df = temp_df.fillna(method="ffill").apply(lambda x: (x - np.mean(x)) / np.std(x), axis=1)
+    54
+    55        21         15.8      0.8      0.0          for inst in self.insts:
+    56        20      25643.7   1282.2      0.4              self.dfs[inst]["alpha"] = -cszscre_df[inst].rolling(12).mean()
+    57        20      17850.2    892.5      0.3              self.dfs[inst]["eligible"] = self.dfs[inst]["eligible"] & (~pd.isna(self.dfs[inst]["alpha"]))
+
+Total time: 234.524 s
+Function: run_simulation at line 145
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+   145                                               @timeme
+   146                                               @profile
+   147                                               def run_simulation(self):
+   148                                                   # defines the date range for the backtest
+   149         3       1788.2    596.1      0.0          date_range = pd.date_range(start=self.start, end=self.end, freq="D")
+   150
+   151                                                   # defines which instrument were eligible to trade on each date of the date_range
+   152                                                   # also computes daily returns for each instrument
+   153         3   11853261.7    4e+06      5.1          self.compute_meta_info(trade_range=date_range)
+   154
+   155                                                   # create the portfolio_df with the initial settings
+   156         3      15620.7   5206.9      0.0          portfolio_df = self.init_portfolio_settings(trade_range=date_range)
+   157
+   158     15897      18979.4      1.2      0.0          for i in portfolio_df.index:
+   159     15894    1969246.6    123.9      0.8              date = portfolio_df.at[i, "datetime"]
+   160
+   161                                                       # filtering the instrument that were eligible for trading on the date      
+   162     15894   12194266.8    767.2      5.2              eligibles = [inst for inst in self.insts if self.dfs[inst].at[date, "eligible"]]
+   163     15894     154559.7      9.7      0.1              non_eligibles = [inst for inst in self.insts if inst not in eligibles]     
+   164
+   165                                                       # initial scalar applied to forecasts, used for volatility targeting       
+   166     15894       6637.6      0.4      0.0              strat_scalar = 2
+   167
+   168     15894       8027.5      0.5      0.0              if i != 0:
+   169                                                           # computes the pnl for the date
+   170     15891     620825.1     39.1      0.3                  date_prev = portfolio_df.at[i - 1, "datetime"]
+   171
+   172                                                           # gets the scalar used for strategy vol targeting
+   173     31782     126313.9      4.0      0.1                  strat_scalar = self.get_strat_scalar(
+   174     15891       8050.3      0.5      0.0                      target_vol=self.portfolio_vol,
+   175     15891       6720.7      0.4      0.0                      ewmas=self.ewmas,
+   176     15891       6978.0      0.4      0.0                      ewstrats=self.ewstrats
+   177                                                           )
+   178
+   179     31782   77516457.0   2439.0     33.1                  day_pnl, capital_ret = get_pnl_stats(
+   180     15891       5918.1      0.4      0.0                      date=date,
+   181     15891       5776.1      0.4      0.0                      prev=date_prev,
+   182     15891       5624.8      0.4      0.0                      portfolio_df=portfolio_df,
+   183     15891       6483.0      0.4      0.0                      insts=self.insts,
+   184     15891       5713.4      0.4      0.0                      idx=i,
+   185     15891       6088.8      0.4      0.0                      dfs=self.dfs
+   186                                                           )
+   187
+   188                                                           # updating ewma of capital returns and appending to the list
+   189     31782      24876.5      0.8      0.0                  self.ewmas.append(
+   190     15891      35343.7      2.2      0.0                      0.06 * (capital_ret ** 2) + 0.94 * self.ewmas[-1] if capital_ret != 0 else self.ewmas[-1])
+   191
+   192
+   193                                                           # updating ewma of strat scalars and appending to the list
+   194     31782      17614.5      0.6      0.0                  self.ewstrats.append(
+   195     15891      16690.3      1.1      0.0                      0.06 * strat_scalar + 0.94 * self.ewstrats[-1] if capital_ret != 0 else self.ewstrats[-1])
+   196
+   197     15894      12130.6      0.8      0.0              self.strat_scalars.append(strat_scalar)
+   198
+   199                                                       # generates the signal for all instruments on this date
+   200     15894   12342755.9    776.6      5.3              forecasts, forecast_chips = self.compute_signal_distribution(eligibles, date)
+   201
+   202                                                       # compute positions and other information
+   203     36267      20131.7      0.6      0.0              for inst in non_eligibles:
+   204                                                           # weights and # of units of each instrument in the portfolio, for date i, instrument inst
+   205     20373    1351411.1     66.3      0.6                  portfolio_df.at[i, f"{inst} w"] = 0
+   206     20373    1276468.5     62.7      0.5                  portfolio_df.at[i, f"{inst} units"] = 0
+   207
+   208                                                       # position size adjustment for volatility targeting
+   209                                                       # we convert the annualised vol target to a daily vol expressed in dollar terms
+   210     15894    1413365.5     88.9      0.6              vol_target = (self.portfolio_vol / np.sqrt(253)) * portfolio_df.at[i, "capital"]
+   211
+   212     15894       8673.3      0.5      0.0              nominal_total = 0
+   213    313401     166106.6      0.5      0.1              for inst in eligibles:
+   214                                                           # forecast is the position direction and size
+   215    297507     160460.6      0.5      0.1                  forecast = forecasts[inst]
+   216
+   217                                                           # scaled_forecast = % of inst alpha / sum of absolute alpha of all insts
+   218    297507     295301.5      1.0      0.1                  scaled_forecast = forecast / forecast_chips if forecast_chips != 0 else 0
+   219    297507     175990.4      0.6      0.1                  inst_vol_target = scaled_forecast * vol_target
+   220    297507   22850346.8     76.8      9.7                  inst_vol = self.dfs[inst].at[date, "vol"] * self.dfs[inst].at[date, "close"]
+   221    297507     221702.6      0.7      0.1                  position = strat_scalar * inst_vol_target / inst_vol
+   222
+   223                                                           # adds the units of each instrument for the date
+   224    297507   18398991.4     61.8      7.8                  portfolio_df.at[i, f"{inst} units"] = position
+   225    297507   12425736.8     41.8      5.3                  nominal_total += abs(position * self.dfs[inst].at[date, "close"])      
+   226
+   227    313401     168824.3      0.5      0.1              for inst in eligibles:
+   228    297507   24068615.5     80.9     10.3                  units = portfolio_df.at[i, f"{inst} units"]
+   229    297507   12454066.4     41.9      5.3                  nominal_inst = units * self.dfs[inst].at[date, "close"]
+   230    297507     203223.9      0.7      0.1                  inst_w = nominal_inst / nominal_total
+   231
+   232                                                           # adds the weight of each instrument for the date
+   233    297507   18666842.5     62.7      8.0                  portfolio_df.at[i, f"{inst} w"] = inst_w
+   234
+   235                                                       # computes the portfolio nominal notional and leverage for the date        
+   236     15894     954168.1     60.0      0.4              portfolio_df.at[i, "nominal"] = nominal_total
+   237     15894    2239251.6    140.9      1.0              portfolio_df.at[i, "leverage"] = nominal_total / portfolio_df.at[i, "capital"]
+   238
+   239         3      11625.8   3875.3      0.0          return portfolio_df.set_index("datetime", drop=True)
+
+
+
+
 '''

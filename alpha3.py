@@ -32,6 +32,7 @@ class Alpha3(Alpha):
             self.dfs[inst]["alpha"] = alpha
         return
 
+    # @profile
     def post_compute(self, trade_range):
         for inst in self.insts:
             self.dfs[inst]["eligible"] = self.dfs[inst]["eligible"] & (~pd.isna(self.dfs[inst]["alpha"]))
