@@ -94,6 +94,7 @@ class Alpha:
     def compute_signal_distribution(self, eligibles, date):
         raise AbstractImplementationException("A concrete implementation for signal generation is missing.")
 
+    # @profile
     def compute_meta_info(self, trade_range):
 
         self.pre_compute(trade_range=trade_range)
@@ -125,7 +126,9 @@ class Alpha:
             sampled = self.dfs[inst]["close"] != self.dfs[inst]["close"].shift(1).fillna(method="bfill")
 
             # sets eligible = 0 if the close price has been stale for 5 days in a row
-            eligible = sampled.rolling(5).apply(lambda x: int(np.any(x))).fillna(0)
+            # we use apply(... raw=True) to avoid the creation of a new Series for each of the rolling windows
+            # as the creation of Series is expensive
+            eligible = sampled.rolling(5).apply(lambda x: int(np.any(x)), raw=True).fillna(0)
 
             # you can add any additional conditions desired in the "eligible" column, such as minimum volume, price, etc
             # this one requires the close price to change at least once every 5 days and for the close price to be > 0
