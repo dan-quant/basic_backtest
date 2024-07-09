@@ -99,7 +99,6 @@ class Alpha:
 
         self.pre_compute(trade_range=trade_range)
 
-        vols, rets, closes, eligibles = [], [], [], []
         for inst in self.insts:
 
             # cleans the self.dfs dict of dataframes (via join), so they all have the same date range as the backtest
@@ -129,24 +128,12 @@ class Alpha:
             # sets eligible = 0 if the close price has been stale for 5 days in a row
             # we use apply(... raw=True) to avoid the creation of a new Series for each of the rolling windows
             # as the creation of Series is expensive
+
             eligible = sampled.rolling(5).apply(lambda x: int(np.any(x)), raw=True).fillna(0)
 
             # you can add any additional conditions desired in the "eligible" column, such as minimum volume, price, etc
             # this one requires the close price to change at least once every 5 days and for the close price to be > 0
-            eligibles.append(eligible.astype(int) & (self.dfs[inst]["close"] > 0).astype(int))
-            closes.append(self.dfs[inst]["close"])
-            rets.append(self.dfs[inst]["ret"])
-            vols.append(self.dfs[inst]["vol"])
-
-        # concatenate every item of the list eligibles such that each item is one column (axis=1)
-        self.eligiblesdf = pd.concat(eligibles, axis=1)
-        self.eligiblesdf.columns = self.insts
-        self.closedf = pd.concat(closes, axis=1)
-        self.closedf.columns = self.insts
-        self.retdf = pd.concat(rets, axis=1)
-        self.retdf.columns=self.insts
-        self.voldf = pd.concat(vols, axis=1)
-        self.voldf.columns = self.insts
+            self.dfs[inst]["eligible"] = eligible.astype(int) & (self.dfs[inst]["close"] > 0).astype(int)
 
         self.post_compute(trade_range=trade_range)
 
