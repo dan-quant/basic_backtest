@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
-from utils import Alpha
-
+# from utils import Alpha
+from utils import EfficientAlpha as Alpha
 
 class Alpha1(Alpha):
     '''
@@ -40,7 +40,7 @@ class Alpha1(Alpha):
 
         return
 
-    @profile
+    # @profile
     def post_compute(self, trade_range):
         temp = []
         for inst in self.insts:

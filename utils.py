@@ -99,6 +99,7 @@ class Alpha:
 
         self.pre_compute(trade_range=trade_range)
 
+        vols, rets, closes, eligibles = [], [], [], []
         for inst in self.insts:
 
             # cleans the self.dfs dict of dataframes (via join), so they all have the same date range as the backtest
@@ -132,7 +133,20 @@ class Alpha:
 
             # you can add any additional conditions desired in the "eligible" column, such as minimum volume, price, etc
             # this one requires the close price to change at least once every 5 days and for the close price to be > 0
-            self.dfs[inst]["eligible"] = eligible.astype(int) & (self.dfs[inst]["close"] > 0).astype(int)
+            eligibles.append(eligible.astype(int) & (self.dfs[inst]["close"] > 0).astype(int))
+            closes.append(self.dfs[inst]["close"])
+            rets.append(self.dfs[inst]["ret"])
+            vols.append(self.dfs[inst]["vol"])
+
+        # concatenate every item of the list eligibles such that each item is one column (axis=1)
+        self.eligiblesdf = pd.concat(eligibles, axis=1)
+        self.eligiblesdf.columns = self.insts
+        self.closedf = pd.concat(closes, axis=1)
+        self.closedf.columns = self.insts
+        self.retdf = pd.concat(rets, axis=1)
+        self.retdf.columns=self.insts
+        self.voldf = pd.concat(vols, axis=1)
+        self.voldf.columns = self.insts
 
         self.post_compute(trade_range=trade_range)
 
@@ -143,7 +157,7 @@ class Alpha:
         return (target_vol / ann_realized_vol) * ewstrats[-1]
 
     @timeme
-    @profile
+    # @profile
     def run_simulation(self):
         # defines the date range for the backtest
         date_range = pd.date_range(start=self.start, end=self.end, freq="D")
@@ -270,3 +284,146 @@ class Portfolio(Alpha):
                 forecasts[inst] += self.positions[inst].at[date, i] * (1/len(self.strat_dfs))
 
         return forecasts, np.sum(np.abs(list(forecasts.values())))
+
+
+class EfficientAlpha:
+
+    def __init__(self, insts, dfs, start, end, portfolio_vol=0.20):
+        self.insts = insts
+        self.dfs = deepcopy(dfs)
+        self.start = start
+        self.end = end
+        self.portfolio_vol = portfolio_vol
+        self.ewmas = [0.01] # stores the ewma of the capital returns
+        self.ewstrats = [1]  # stores the ewma of the strat scalars
+        self.strat_scalars = [] # stores the strat scalars
+
+    def init_portfolio_settings(self, trade_range):
+
+        # creates the portfolio_df with the same date range as the backtest, however with datetimes as columns not index
+        portfolio_df = pd.DataFrame(index=trade_range)\
+            .reset_index()\
+            .rename(columns={"index": "datetime"})
+
+        # gives initial parameters on the first date of the trade_range
+        portfolio_df.at[0, "capital"] = 10000.0
+        portfolio_df.at[0, "day_pnl"] = 0.0
+        portfolio_df.at[0, "capital_ret"] = 0.0
+        portfolio_df.at[0, "nominal_ret"] = 0.0
+
+        return portfolio_df
+
+    def pre_compute(self, trade_range):
+        pass
+
+    def post_compute(self, trade_range):
+        pass
+
+    def compute_signal_distribution(self, eligibles, date):
+        raise AbstractImplementationException("A concrete implementation for signal generation is missing.")
+
+    def get_strat_scalar(self, target_vol, ewmas, ewstrats):
+        ann_realized_vol = np.sqrt(ewmas[-1] * 253)
+        return (target_vol / ann_realized_vol) * ewstrats[-1]
+
+    def compute_meta_info(self, trade_range):
+
+        self.pre_compute(trade_range=trade_range)
+
+        vols, rets, closes, eligibles = [], [], [], []
+        for inst in self.insts:
+            # cleans the self.dfs dict of dataframes (via join), so they all have the same date range as the backtest
+            # computes daily returns for each instrument
+            # stores eligibility of each instrument for each date based on the define criteria
+            df = pd.DataFrame(index=trade_range)
+
+            # annualised rolling 30-day historical volatility. it needs to be computed before the join, otherwise we
+            # will underestimate vol because the ffill and bfill in the join will result in some 0 return days (same
+            # close prices). by computing the volatility before joining, the ffill and bfill will propagate the vol
+            # forwards and backwards, not the close prices that will be used to compute the vol
+            # this vol computation can be replaced by a more sophisticated model (GARCH EWMA, etc)
+            inst_vol = self.dfs[inst]["close"].pct_change().rolling(30).std()
+            self.dfs[inst] = df.join(self.dfs[inst], how="left").fillna(method="ffill").fillna(method="bfill")
+            self.dfs[inst]["ret"] = self.dfs[inst]["close"].pct_change()
+            self.dfs[inst]["vol"] = inst_vol
+            self.dfs[inst]["vol"] = self.dfs[inst]["vol"].fillna(method="ffill").fillna(method="bfill")
+
+            # given that the inst vol parameterizes the position size, if the vol drops too much, the position will
+            # blow up to a huge number. with that, it is good practice to set a minimum vol
+            self.dfs[inst]["vol"] = np.where(self.dfs[inst]["vol"] < 0.005, 0.005, self.dfs[inst]["vol"])
+
+            # sampled = pandas series of booleans that checks if the close for a given date is the same as the close
+            # of the previous date
+            sampled = self.dfs[inst]["close"] != self.dfs[inst]["close"].shift(1).fillna(method="bfill")
+
+            # sets eligible = 0 if the close price has been stale for 5 days in a row
+            # we use apply(... raw=True) to avoid the creation of a new Series for each of the rolling windows
+            # as the creation of Series is expensive
+            eligible = sampled.rolling(5).apply(lambda x: int(np.any(x)), raw=True).fillna(0)
+            self.dfs[inst]["eligible"] = eligible.astype(int) & (self.dfs[inst]["close"] > 0).astype(int)
+
+            # you can add any additional conditions desired in the "eligible" column, such as minimum volume, price, etc
+            # this one requires the close price to change at least once every 5 days and for the close price to be > 0
+            eligibles.append(self.dfs[inst]["eligible"])
+            closes.append(self.dfs[inst]["close"])
+            rets.append(self.dfs[inst]["ret"])
+            vols.append(self.dfs[inst]["vol"])
+
+        # concatenate every item of the list eligibles such that each item is one column (axis=1)
+        self.eligiblesdf = pd.concat(eligibles, axis=1)
+        self.eligiblesdf.columns = self.insts
+        self.closedf = pd.concat(closes, axis=1)
+        self.closedf.columns = self.insts
+        self.retdf = pd.concat(rets, axis=1)
+        self.retdf.columns = self.insts
+        self.voldf = pd.concat(vols, axis=1)
+        self.voldf.columns = self.insts
+
+        self.post_compute(trade_range=trade_range)
+
+        return
+
+    @timeme
+    # @profile
+    def run_simulation(self):
+        date_range = pd.date_range(start=self.start, end=self.end, freq="D")
+        self.compute_meta_info(trade_range=date_range)
+        self.portfolio_df= self.init_portfolio_settings(trade_range=date_range)
+
+        for (data) in self.zip_data_generator():
+            portfolio_i = data["portfolio_i"]
+            portfolio_row = data["portfolio_row"]
+            ret_i = data["ret_i"]
+            ret_row = data["ret_row"]
+            close_row = data["close_row"]
+            eligibles_row = data["eligibles_row"]
+            vol_row = data["vol_row"]
+            input(portfolio_i)
+            input(portfolio_row)
+            input(ret_i)
+            input(ret_row)
+            input(close_row)
+            input(eligibles_row)
+            input(vol_row)
+
+    def zip_data_generator(self):
+        for (portfolio_i, portfolio_row), \
+            (ret_i, ret_row), \
+            (close_i, close_row), \
+            (eligibles_i, eligibles_row), \
+            (vol_i, vol_row) in zip(
+                self.portfolio_df.iterrows(),
+                self.retdf.iterrows(),
+                self.closedf.iterrows(),
+                self.eligiblesdf.iterrows(),
+                self.voldf.iterrows()
+            ):
+            yield {
+                "portfolio_i": portfolio_i,
+                "portfolio_row": portfolio_row,
+                "ret_i": ret_i,
+                "ret_row": ret_row,
+                "close_row": close_row,
+                "eligibles_row": eligibles_row,
+                "vol_row": vol_row
+            }

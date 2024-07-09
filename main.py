@@ -126,25 +126,25 @@ def main():
                     end=PERIOD_END_DATE
                     )
 
-    alpha2 = Alpha2(insts=tickers[:NUMBER_OF_TICKERS],
-                    dfs=ticker_dfs,
-                    start=PERIOD_START_DATE,
-                    end=PERIOD_END_DATE
-                    )
-
-    alpha3 = Alpha3(insts=tickers[:NUMBER_OF_TICKERS],
-                    dfs=ticker_dfs,
-                    start=PERIOD_START_DATE,
-                    end=PERIOD_END_DATE
-                    )
+    # alpha2 = Alpha2(insts=tickers[:NUMBER_OF_TICKERS],
+    #                 dfs=ticker_dfs,
+    #                 start=PERIOD_START_DATE,
+    #                 end=PERIOD_END_DATE
+    #                 )
+    #
+    # alpha3 = Alpha3(insts=tickers[:NUMBER_OF_TICKERS],
+    #                 dfs=ticker_dfs,
+    #                 start=PERIOD_START_DATE,
+    #                 end=PERIOD_END_DATE
+    #                 )
 
     df1 = alpha1.run_simulation()
-    df2 = alpha2.run_simulation()
-    df3 = alpha3.run_simulation()
+    # df2 = alpha2.run_simulation()
+    # df3 = alpha3.run_simulation()
 
     print(f"df1: {list(df1.capital)[-1]}")
-    print(f"df2: {list(df2.capital)[-1]}")
-    print(f"df3: {list(df3.capital)[-1]}")
+    # print(f"df2: {list(df2.capital)[-1]}")
+    # print(f"df3: {list(df3.capital)[-1]}")
 
     # portfolio = Portfolio(insts=tickers[:10],
     #                       dfs=ticker_dfs,
