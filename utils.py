@@ -54,6 +54,21 @@ def get_pnl_stats(date, prev, portfolio_df, insts, idx, dfs):
     return day_pnl, capital_ret
 
 
+def _get_pnl_stats(last_weights, last_units, close_prev, portfolio_i, ret_row, portfolio_df):
+    day_pnl = 0
+    nominal_ret = 0
+
+    day_pnl = np.sum(last_units * close_prev * ret_row)
+    nominal_ret = np.dot(last_weights, ret_row)
+    capital_ret = nominal_ret * portfolio_df.at[portfolio_i - 1, "leverage"]
+    portfolio_df.at[portfolio_i, "capital"] = portfolio_df.at[portfolio_i - 1, "capital"] + day_pnl
+    portfolio_df.at[portfolio_i, "day_pnl"] = day_pnl
+    portfolio_df.at[portfolio_i, "nominal_ret"] = nominal_ret
+    portfolio_df.at[portfolio_i, "capital_ret"] = capital_ret
+
+    return day_pnl, capital_ret
+
+
 class AbstractImplementationException(Exception):
     pass
 
@@ -375,7 +390,12 @@ class EfficientAlpha:
     def run_simulation(self):
         date_range = pd.date_range(start=self.start, end=self.end, freq="D")
         self.compute_meta_info(trade_range=date_range)
-        self.portfolio_df= self.init_portfolio_settings(trade_range=date_range)
+        self.portfolio_df = self.init_portfolio_settings(trade_range=date_range)
+
+        units_held, weights_held = [], []
+        close_prev = None
+        self.ewmas, self.ewstrats = [0.01], [1]
+        self.strat_scalars = []
 
         for (data) in self.zip_data_generator():
             portfolio_i = data["portfolio_i"]
@@ -385,14 +405,49 @@ class EfficientAlpha:
             close_row = data["close_row"]
             eligibles_row = data["eligibles_row"]
             vol_row = data["vol_row"]
-            input(portfolio_i)
-            input(portfolio_row)
-            input(ret_i)
-            input(ret_row)
-            input(close_row)
-            input(eligibles_row)
-            input(vol_row)
 
+            strat_scalar = 2
+
+            if portfolio_i != 0:
+                strat_scalar = self.get_strat_scalar(
+                    target_vol=self.portfolio_vol,
+                    ewmas=self.ewmas,
+                    ewstrats=self.ewstrats
+                )
+                day_pnl, capital_ret = _get_pnl_stats(
+                    last_weights=weights_held[-1],
+                    last_units=units_held[-1],
+                    close_prev=close_prev,
+                    portfolio_i=portfolio_i,
+                    ret_row=ret_row,
+                    portfolio_df=self.portfolio_df
+                )
+
+            self.strat_scalars.append(strat_scalar)
+            forecast, forecast_chips = self.compute_signal_distribution(
+                eligibles_row,
+                ret_i
+            )
+
+            vol_target = (self.portfolio_vol / np.sqrt(253)) * self.portfolio_df.at[portfolio_i, "capital"]
+            positions = strat_scalar * \
+                        forecast / forecast_chips \
+                        * vol_target \
+                        / (vol_row * close_row)
+            positions = np.nan_to_num(positions, nan=0, posinf=0, neginf=0)
+            nominal_tot = np.linalg.norm(positions * close_row, ord=1)
+            units_held.append(positions)
+
+            weights = positions * close_row / nominal_tot
+            weights = np.nan_to_num(weights, nan=0, posinf=0, neginf=0)
+            weights_held.append(weights)
+
+            self.portfolio_df.at[portfolio_i, "nominal"] = nominal_tot
+            self.portfolio_df.at[portfolio_i, "leverage"] = nominal_tot / self.portfolio_df.at[portfolio_i, "capital"]
+
+            close_prev = close_row
+
+        return self.portfolio_df.set_index("datetime", drop=True)
     def zip_data_generator(self):
         for (portfolio_i, portfolio_row), \
             (ret_i, ret_row), \

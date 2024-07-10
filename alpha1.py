@@ -52,28 +52,26 @@ class Alpha1(Alpha):
         temp_df = temp_df.replace(np.inf, 0).replace(-np.inf, 0)
         cszscre_df = temp_df.fillna(method="ffill").apply(lambda x: (x - np.mean(x)) / np.std(x), axis=1)
 
+        alphas = []
         for inst in self.insts:
             self.dfs[inst]["alpha"] = -cszscre_df[inst].rolling(12).mean()
-            self.dfs[inst]["eligible"] = self.dfs[inst]["eligible"] & (~pd.isna(self.dfs[inst]["alpha"]))
+            alphas.append(self.dfs[inst]["alpha"])
+
+        alphadf = pd.concat(alphas, axis=1)
+        alphadf.columns = self.insts
+        self.alphadf = alphadf
+        self.eligiblesdf = self.eligiblesdf & (~pd.isna(alphadf))
+
+        masked_df = self.alphadf / self.eligiblesdf
+        masked_df = masked_df.replace([-np.inf, np.inf], np.nan)
+        num_eligibles = self.eligiblesdf.sum(axis=1)
+        rankdf = masked_df.rank(axis=1, method="average", na_option="keep", ascending=True)
+        shortdf = rankdf.apply(lambda col: col <= num_eligibles.values/4, axis=0, raw=True)
+        longdf = rankdf.apply(lambda col: col > np.ceil(num_eligibles.values - num_eligibles.values / 4), axis=0, raw=True)
+        forecast_df = -shortdf.astype(np.int32) + longdf.astype(np.int32)
+        self.forecast_df = forecast_df
+        return
 
     def compute_signal_distribution(self, eligibles, date):
-        alpha_scores = {}
-
-        for inst in eligibles:
-            # get the alphas generated for each instrument on each date
-            alpha_scores[inst] = self.dfs[inst].at[date, "alpha"]
-
-        # sorts the alpha_scores dict by their alpha values
-        alpha_scores = {k: v for k, v in sorted(alpha_scores.items(), key=lambda pair: pair[1])}
-
-        # example of long-short strategy where we buy the top 25% and sell the bottom 25% alphas
-        alpha_long = list(alpha_scores.keys())[-int(len(eligibles) / 4):]
-        alpha_short = list(alpha_scores.keys())[:int(len(eligibles) / 4)]
-
-        forecasts = {}
-        for inst in eligibles:
-            forecasts[inst] = 1 if inst in alpha_long else (-1 if inst in alpha_short else 0)
-
-        forecast_chips = np.sum(np.abs(list(forecasts.values())))
-
-        return forecasts, forecast_chips
+        forecasts = self.forecast_df.loc[date].values
+        return forecasts, np.sum(np.abs(forecasts))
