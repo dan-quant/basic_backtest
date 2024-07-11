@@ -55,6 +55,8 @@ def get_pnl_stats(date, prev, portfolio_df, insts, idx, dfs):
 
 
 def _get_pnl_stats(last_weights, last_units, close_prev, portfolio_i, ret_row, portfolio_df):
+    ret_row = np.nan_to_num(ret_row, nan=0, posinf=0, neginf=0)
+
     day_pnl = 0
     nominal_ret = 0
 
@@ -448,6 +450,7 @@ class EfficientAlpha:
             close_prev = close_row
 
         return self.portfolio_df.set_index("datetime", drop=True)
+
     def zip_data_generator(self):
         for (portfolio_i, portfolio_row), \
             (ret_i, ret_row), \
