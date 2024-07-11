@@ -50,6 +50,10 @@ class Alpha1(Alpha):
         temp_df = pd.concat(temp, axis=1)
         temp_df.columns = self.insts
         temp_df = temp_df.replace(np.inf, 0).replace(-np.inf, 0)
+        # we cant use a numpy array below (raw=True) because numpy is NOT NaN aware, so if there is one NaN in the array
+        # all the results of the computation will be NaN
+        # on the other hand, pandas series ARE NaN aware, so the computation just ignores NaN values and also preserves
+        # the location of the NaN in the series
         cszscre_df = temp_df.fillna(method="ffill").apply(lambda x: (x - np.mean(x)) / np.std(x), axis=1)
 
         alphas = []
