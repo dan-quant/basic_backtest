@@ -31,6 +31,7 @@ def save_pickle(path, obj):
         pickle.dump(obj, file_write)
 
 
+# @profile
 def get_pnl_stats(last_weights, last_units, close_prev, portfolio_i, ret_row, portfolio_df):
     ret_row = np.nan_to_num(ret_row, nan=0, posinf=0, neginf=0)
 
@@ -92,6 +93,7 @@ class Alpha:
         ann_realized_vol = np.sqrt(ewmas[-1] * 253)
         return (target_vol / ann_realized_vol) * ewstrats[-1]
 
+    # @profile
     def compute_meta_info(self, trade_range):
 
         self.pre_compute(trade_range=trade_range)
@@ -227,12 +229,12 @@ class Alpha:
             ):
             yield {
                 "portfolio_i": portfolio_i,
-                "portfolio_row": portfolio_row,
+                "portfolio_row": portfolio_row.values,
                 "ret_i": ret_i,
-                "ret_row": ret_row,
-                "close_row": close_row,
-                "eligibles_row": eligibles_row,
-                "vol_row": vol_row
+                "ret_row": ret_row.values,
+                "close_row": close_row.values,
+                "eligibles_row": eligibles_row.values,
+                "vol_row": vol_row.values
             }
 
 

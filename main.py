@@ -478,7 +478,16 @@ Line #      Hits         Time  Per Hit   % Time  Line Contents
    238
    239         3      11625.8   3875.3      0.0          return portfolio_df.set_index("datetime", drop=True)
 
+####### WITH VECTORIZATION #######
+Another 57% reduction
 
+@timeme: run_simulation took 10.291310787200928 seconds.
+df1: 10814.614107347234
+Not the same number as before. Hanguk's code also gives a different output.
+Total reduction = 80%
 
-
+####### CONVERTING ALL DATAFRAMES TO NUMPY ARRAYS BEFORE COMPUTATIONS ######
+ANOTHER 30% REDUCTION. TOTAL OF 86% NOW
+@timeme: run_simulation took 7.050583600997925 seconds.
+df1: 10814.614107347234
 '''
