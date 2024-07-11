@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
-# from utils import Alpha
-from utils import EfficientAlpha as Alpha
+from utils import Alpha
+
 
 class Alpha1(Alpha):
     '''
