@@ -54,7 +54,8 @@ class Alpha1(Alpha):
         # all the results of the computation will be NaN
         # on the other hand, pandas series ARE NaN aware, so the computation just ignores NaN values and also preserves
         # the location of the NaN in the series
-        cszscre_df = temp_df.fillna(method="ffill").apply(lambda x: (x - np.mean(x)) / np.std(x), axis=1)
+        # HOWEVER, Numpy has np.nanmean() and np.nanstd(), which are NaN aware version of the functions
+        cszscre_df = temp_df.fillna(method="ffill").apply(lambda x: (x - np.nanmean(x)) / np.nanstd(x), axis=1, raw=True)
 
         alphas = []
         for inst in self.insts:
