@@ -126,25 +126,25 @@ def main():
                     end=PERIOD_END_DATE
                     )
 
-    # alpha2 = Alpha2(insts=tickers[:NUMBER_OF_TICKERS],
-    #                 dfs=ticker_dfs,
-    #                 start=PERIOD_START_DATE,
-    #                 end=PERIOD_END_DATE
-    #                 )
-    #
-    # alpha3 = Alpha3(insts=tickers[:NUMBER_OF_TICKERS],
-    #                 dfs=ticker_dfs,
-    #                 start=PERIOD_START_DATE,
-    #                 end=PERIOD_END_DATE
-    #                 )
+    alpha2 = Alpha2(insts=tickers[:NUMBER_OF_TICKERS],
+                    dfs=ticker_dfs,
+                    start=PERIOD_START_DATE,
+                    end=PERIOD_END_DATE
+                    )
+
+    alpha3 = Alpha3(insts=tickers[:NUMBER_OF_TICKERS],
+                    dfs=ticker_dfs,
+                    start=PERIOD_START_DATE,
+                    end=PERIOD_END_DATE
+                    )
 
     df1 = alpha1.run_simulation()
-    # df2 = alpha2.run_simulation()
-    # df3 = alpha3.run_simulation()
+    df2 = alpha2.run_simulation()
+    df3 = alpha3.run_simulation()
 
     print(f"df1: {list(df1.capital)[-1]}")
-    # print(f"df2: {list(df2.capital)[-1]}")
-    # print(f"df3: {list(df3.capital)[-1]}")
+    print(f"df2: {list(df2.capital)[-1]}")
+    print(f"df3: {list(df3.capital)[-1]}")
 
     # portfolio = Portfolio(insts=tickers[:10],
     #                       dfs=ticker_dfs,
@@ -165,8 +165,8 @@ if __name__ == '__main__':
 @timeme: run_simulation took 52.4849579334259 seconds.
 @timeme: run_simulation took 52.523226261138916 seconds.
 df1: 31346.569762350704
-df1: 9731.451568466826
-df1: 110581.37703868462
+df2: 9731.451568466826
+df3: 110581.37703868462
 
 Sun Jun 30 23:14:04 2024    stats.txt
 
@@ -489,5 +489,12 @@ Total reduction = 80%
 ####### CONVERTING ALL DATAFRAMES TO NUMPY ARRAYS BEFORE COMPUTATIONS ######
 ANOTHER 30% REDUCTION. TOTAL OF 86% NOW
 @timeme: run_simulation took 7.050583600997925 seconds.
+df1: 10814.614107347234
+
+###### CHANGED .APPLY() to raw=True which uses numpy arrays, however, used np.nanmean() and np.nanstd() since they are NaN aware #######
+22% decrese in time.
+89% total reduction
+
+@timeme: run_simulation took 5.550048589706421 seconds.
 df1: 10814.614107347234
 '''

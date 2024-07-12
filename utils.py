@@ -190,16 +190,21 @@ class Alpha:
                 )
 
             self.strat_scalars.append(strat_scalar)
-            forecast, forecast_chips = self.compute_signal_distribution(
+            forecast = self.compute_signal_distribution(
                 eligibles_row,
                 ret_i
             )
+            if type(forecast) == pd.Series:
+                forecast = forecast.values
 
+            forecast = forecast / eligibles_row
+            forecast = np.nan_to_num(forecast, nan=0, posinf=0, neginf=0)
+            forecast_chips = np.sum(np.abs(forecast))
             vol_target = (self.portfolio_vol / np.sqrt(253)) * self.portfolio_df.at[portfolio_i, "capital"]
             positions = strat_scalar * \
                         forecast / forecast_chips \
                         * vol_target \
-                        / (vol_row * close_row)
+                        / (vol_row * close_row) if forecast_chips != 0 else np.zeros(len(self.insts))
             positions = np.nan_to_num(positions, nan=0, posinf=0, neginf=0)
             nominal_tot = np.linalg.norm(positions * close_row, ord=1)
             units_held.append(positions)

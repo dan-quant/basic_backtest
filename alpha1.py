@@ -49,7 +49,10 @@ class Alpha1(Alpha):
 
         temp_df = pd.concat(temp, axis=1)
         temp_df.columns = self.insts
-        temp_df = temp_df.replace(np.inf, 0).replace(-np.inf, 0)
+
+        # changed the default value from 0 to np.nan as 0 affects the cszscre computation, while np.nan gets ignored
+        temp_df = temp_df.replace(np.inf, np.nan).replace(-np.inf, np.nan)
+
         # we cant use a numpy array below (raw=True) because numpy is NOT NaN aware, so if there is one NaN in the array
         # all the results of the computation will be NaN
         # on the other hand, pandas series ARE NaN aware, so the computation just ignores NaN values and also preserves
@@ -66,8 +69,7 @@ class Alpha1(Alpha):
         alphadf = pd.concat(alphas, axis=1)
         alphadf.columns = self.insts
         self.alphadf = alphadf
-        self.eligiblesdf = self.eligiblesdf & (~pd.isna(alphadf))
-
+        self.eligiblesdf = self.eligiblesdf & (~pd.isna(alphadf)).astype(np.int32)
         masked_df = self.alphadf / self.eligiblesdf
         masked_df = masked_df.replace([-np.inf, np.inf], np.nan)
         num_eligibles = self.eligiblesdf.sum(axis=1)
@@ -80,4 +82,4 @@ class Alpha1(Alpha):
 
     def compute_signal_distribution(self, eligibles, date):
         forecasts = self.forecast_df.loc[date].values
-        return forecasts, np.sum(np.abs(forecasts))
+        return forecasts

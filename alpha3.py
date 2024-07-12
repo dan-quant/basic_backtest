@@ -34,17 +34,15 @@ class Alpha3(Alpha):
 
     # @profile
     def post_compute(self, trade_range):
+        temp = []
         for inst in self.insts:
-            self.dfs[inst]["eligible"] = self.dfs[inst]["eligible"] & (~pd.isna(self.dfs[inst]["alpha"]))
+            temp.append(self.dfs[inst]["alpha"])
+
+        self.alphadf = pd.concat(temp, axis=1)
+        self.alphadf.columns = self.insts
+        self.alphadf = self.alphadf.fillna(method="ffill")
+        self.eligiblesdf = self.eligiblesdf & (~pd.isna(self.alphadf)).astype(np.int32)
 
     def compute_signal_distribution(self, eligibles, date):
-        forecasts = {}
-
-        for inst in eligibles:
-            # get the alphas generated for each instrument on each date
-            forecasts[inst] = self.dfs[inst].at[date, "alpha"]
-
-        absolute_scores = np.abs([score for score in forecasts.values()])
-        forecast_chips = np.sum(absolute_scores)
-
-        return forecasts, forecast_chips
+        forecasts = self.alphadf.loc[date].values
+        return forecasts
