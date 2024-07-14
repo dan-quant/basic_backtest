@@ -32,7 +32,7 @@ def save_pickle(path, obj):
 
 
 # @profile
-def get_pnl_stats(last_weights, last_units, close_prev, portfolio_i, ret_row, portfolio_df):
+def get_pnl_stats(last_weights, last_units, close_prev, ret_row, leverages):
     ret_row = np.nan_to_num(ret_row, nan=0, posinf=0, neginf=0)
 
     day_pnl = 0
@@ -40,13 +40,13 @@ def get_pnl_stats(last_weights, last_units, close_prev, portfolio_i, ret_row, po
 
     day_pnl = np.sum(last_units * close_prev * ret_row)
     nominal_ret = np.dot(last_weights, ret_row)
-    capital_ret = nominal_ret * portfolio_df.at[portfolio_i - 1, "leverage"]
-    portfolio_df.at[portfolio_i, "capital"] = portfolio_df.at[portfolio_i - 1, "capital"] + day_pnl
-    portfolio_df.at[portfolio_i, "day_pnl"] = day_pnl
-    portfolio_df.at[portfolio_i, "nominal_ret"] = nominal_ret
-    portfolio_df.at[portfolio_i, "capital_ret"] = capital_ret
+    capital_ret = nominal_ret * leverages[-1]
+    # portfolio_df.at[portfolio_i, "capital"] = portfolio_df.at[portfolio_i - 1, "capital"] + day_pnl
+    # portfolio_df.at[portfolio_i, "day_pnl"] = day_pnl
+    # portfolio_df.at[portfolio_i, "nominal_ret"] = nominal_ret
+    # portfolio_df.at[portfolio_i, "capital_ret"] = capital_ret
 
-    return day_pnl, capital_ret
+    return day_pnl,nominal_ret, capital_ret
 
 
 class AbstractImplementationException(Exception):
@@ -64,21 +64,6 @@ class Alpha:
         self.ewmas = [0.01] # stores the ewma of the capital returns
         self.ewstrats = [1]  # stores the ewma of the strat scalars
         self.strat_scalars = [] # stores the strat scalars
-
-    def init_portfolio_settings(self, trade_range):
-
-        # creates the portfolio_df with the same date range as the backtest, however with datetimes as columns not index
-        portfolio_df = pd.DataFrame(index=trade_range)\
-            .reset_index()\
-            .rename(columns={"index": "datetime"})
-
-        # gives initial parameters on the first date of the trade_range
-        portfolio_df.at[0, "capital"] = 10000.0
-        portfolio_df.at[0, "day_pnl"] = 0.0
-        portfolio_df.at[0, "capital_ret"] = 0.0
-        portfolio_df.at[0, "nominal_ret"] = 0.0
-
-        return portfolio_df
 
     def pre_compute(self, trade_range):
         pass
@@ -156,16 +141,17 @@ class Alpha:
     def run_simulation(self):
         date_range = pd.date_range(start=self.start, end=self.end, freq="D")
         self.compute_meta_info(trade_range=date_range)
-        self.portfolio_df = self.init_portfolio_settings(trade_range=date_range)
 
         units_held, weights_held = [], []
         close_prev = None
-        self.ewmas, self.ewstrats = [0.01], [1]
-        self.strat_scalars = []
+        ewmas, ewstrats = [0.01], [1]
+        strat_scalars = []
+        capitals, nominal_rets, capital_rets = [10000.0], [0.0], [0.0]
+        leverages, nominals = [], []
+        day_pnl = 0
 
         for (data) in self.zip_data_generator():
             portfolio_i = data["portfolio_i"]
-            portfolio_row = data["portfolio_row"]
             ret_i = data["ret_i"]
             ret_row = data["ret_row"]
             close_row = data["close_row"]
@@ -177,56 +163,81 @@ class Alpha:
             if portfolio_i != 0:
                 strat_scalar = self.get_strat_scalar(
                     target_vol=self.portfolio_vol,
-                    ewmas=self.ewmas,
-                    ewstrats=self.ewstrats
+                    ewmas=ewmas,
+                    ewstrats=ewstrats
                 )
-                day_pnl, capital_ret = get_pnl_stats(
+
+                day_pnl, nominal_ret, capital_ret = get_pnl_stats(
                     last_weights=weights_held[-1],
                     last_units=units_held[-1],
                     close_prev=close_prev,
-                    portfolio_i=portfolio_i,
                     ret_row=ret_row,
-                    portfolio_df=self.portfolio_df
+                    leverages=leverages
                 )
 
-            self.strat_scalars.append(strat_scalar)
+                capitals.append(capitals[-1] + day_pnl)
+                nominal_rets.append(nominal_ret)
+                capital_rets.append(capital_ret)
+                ewmas.append(0.06 * (capital_ret**2) + 0.94 * ewmas[-1] if capital_ret != 0 else ewmas[-1])
+                ewstrats.append(0.06 * strat_scalar + 0.94 * ewstrats[-1] if capital_ret != 0 else ewstrats[-1])
+
+            strat_scalars.append(strat_scalar)
             forecast = self.compute_signal_distribution(
                 eligibles_row,
                 ret_i
             )
+
             if type(forecast) == pd.Series:
                 forecast = forecast.values
 
             forecast = forecast / eligibles_row
             forecast = np.nan_to_num(forecast, nan=0, posinf=0, neginf=0)
             forecast_chips = np.sum(np.abs(forecast))
-            vol_target = (self.portfolio_vol / np.sqrt(253)) * self.portfolio_df.at[portfolio_i, "capital"]
+            vol_target = (self.portfolio_vol / np.sqrt(253)) * capitals[-1]
             positions = strat_scalar * \
                         forecast / forecast_chips \
                         * vol_target \
                         / (vol_row * close_row) if forecast_chips != 0 else np.zeros(len(self.insts))
             positions = np.nan_to_num(positions, nan=0, posinf=0, neginf=0)
-            nominal_tot = np.linalg.norm(positions * close_row, ord=1)
+            nominals.append(np.linalg.norm(positions * close_row, ord=1))
             units_held.append(positions)
 
-            weights = positions * close_row / nominal_tot
+            weights = positions * close_row / nominals[-1]
             weights = np.nan_to_num(weights, nan=0, posinf=0, neginf=0)
             weights_held.append(weights)
-
-            self.portfolio_df.at[portfolio_i, "nominal"] = nominal_tot
-            self.portfolio_df.at[portfolio_i, "leverage"] = nominal_tot / self.portfolio_df.at[portfolio_i, "capital"]
+            leverages.append(nominals[-1] / capitals[-1])
 
             close_prev = close_row
 
-        return self.portfolio_df.set_index("datetime", drop=True)
+        # arrays of arrays become DataFrames, while arrays of numbers (1 dimension only) become Series
+        units_df = pd.DataFrame(data=units_held, index=date_range, columns=[f'{inst} units' for inst in self.insts])
+        weights_df = pd.DataFrame(data=weights_held, index=date_range, columns=[f'{inst} w' for inst in self.insts])
+        nom_ser = pd.Series(data=nominals, index=date_range, name="nominal_tot")
+        lev_ser = pd.Series(data=leverages, index=date_range, name="leverages")
+        cap_ser = pd.Series(data=capitals, index=date_range, name="capital")
+        nomret_ser = pd.Series(data=nominal_rets, index=date_range, name="nominal_ret")
+        capret_ser = pd.Series(data=capital_rets, index=date_range, name="capital_ret")
+        scalar_ser = pd.Series(data=strat_scalars, index=date_range, name="strat_scalar")
+        portfolio_df = pd.concat([
+            units_df,
+            weights_df,
+            nom_ser,
+            lev_ser,
+            cap_ser,
+            nomret_ser,
+            capret_ser,
+            scalar_ser
+        ], axis=1)
+
+        return portfolio_df
 
     def zip_data_generator(self):
-        for (portfolio_i, portfolio_row), \
+        for (portfolio_i), \
             (ret_i, ret_row), \
             (close_i, close_row), \
             (eligibles_i, eligibles_row), \
             (vol_i, vol_row) in zip(
-                self.portfolio_df.iterrows(),
+                range(len(self.retdf)),
                 self.retdf.iterrows(),
                 self.closedf.iterrows(),
                 self.eligiblesdf.iterrows(),
@@ -234,7 +245,6 @@ class Alpha:
             ):
             yield {
                 "portfolio_i": portfolio_i,
-                "portfolio_row": portfolio_row.values,
                 "ret_i": ret_i,
                 "ret_row": ret_row.values,
                 "close_row": close_row.values,

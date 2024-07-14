@@ -497,4 +497,18 @@ df1: 10814.614107347234
 
 @timeme: run_simulation took 5.550048589706421 seconds.
 df1: 10814.614107347234
+
+###### REMOVING self.portfolio_df.at statements by using lists to keep track of desired metrics ######
+
+ALSO FIXED INCORRECT NUMBERS OUTPUTS = EWMAS AND EWSTRATS WERE DELETED PREVIOUSLY BY MISTAKE. NOW THE NUMBERS MATCH.
+
+
+TOTAL TIME REDUCTION = 93%
+
+@timeme: run_simulation took 3.4997942447662354 seconds.
+@timeme: run_simulation took 2.7996373176574707 seconds.
+@timeme: run_simulation took 2.882639169692993 seconds.
+df1: 31346.569762350657
+df2: 9731.451568466828
+df3: 110581.37703868505
 '''
